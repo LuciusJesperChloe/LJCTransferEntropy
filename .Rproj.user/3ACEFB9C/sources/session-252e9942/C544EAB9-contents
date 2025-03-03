@@ -1,0 +1,41 @@
+library(devtools);
+load_all("."); # Working directory should be in the package SCC_R_package
+
+# Install and load packages
+install.packages("RTransferEntropy")
+install.packages("CADFtest")
+library(CADFtest)
+library(RTransferEntropy)
+library(future)
+
+# Enable parallel processing
+plan(multisession)
+
+# Load data
+Data = read.csv("C:/Users/User/Desktop/Brazil.csv")
+attach(Data)
+x = Data$GDP
+y = Data$NM
+
+final1_output = LJCTransferEntropy(x, 
+                                   y, 
+                                   lx = 1,
+                                   ly = 1,
+                                   q = 0.1,
+                                   entropy = "Shannon",
+                                   shuffles = 100,
+                                   type = "quantiles",
+                                   quantiles = c(5, 95),
+                                   bins = NULL,
+                                   limits = NULL,
+                                   nboot = 300,
+                                   burn = 50,
+                                   quiet = NULL,
+                                   seed = NULL,
+                                   na.rm = TRUE,
+                                   eff_entropy = TRUE,
+                                   cr = "AIC")
+final1_output
+
+# Save results to a CSV file on the desktop without NA values appearing in Excel
+write.table(final1_output, file = "C:/Users/User/Desktop/Iwin.csv", row.names = FALSE, col.names = TRUE, sep = ",", na = "")

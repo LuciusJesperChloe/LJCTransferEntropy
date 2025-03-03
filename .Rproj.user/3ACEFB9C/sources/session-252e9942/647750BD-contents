@@ -1,0 +1,209 @@
+# Install and load packages
+install.packages("RTransferEntropy")
+install.packages("CADFtest")
+library(CADFtest)
+library(RTransferEntropy)
+library(future)
+
+# Enable parallel processing
+plan(multisession)
+
+# Load data
+Data = read.csv("C:/Users/User/Desktop/Brazil.csv")
+attach(Data)
+x = Data$GDP
+y = Data$NM
+
+LJCTransferEntropy = function(x,
+                              y,
+                              lx = 1,
+                              ly = 1,
+                              q = 0.1,
+                              entropy = "Shannon",
+                              shuffles = 100,
+                              type = "quantiles",
+                              quantiles = c(5, 95),
+                              bins = NULL,
+                              limits = NULL,
+                              nboot = 300,
+                              burn = 50,
+                              quiet = NULL,
+                              seed = NULL,
+                              na.rm = TRUE,
+                              eff_entropy = TRUE,
+                              cr = "AIC"){
+  if (!exists(lx)) {
+    lx = 1
+  }if (!exists(ly)) {
+    ly = 1
+  }if (!exists(q)) {
+    q = 0.1
+  }if (!exists(entropy)) {
+    entropy = "Shannon"
+  }if (!exists(shuffles)) {
+    shuffles = 100
+  }if (!exists(type)) {
+    type = "quantiles"
+  }if (!exists(quantiles)) {
+    quantiles = c(5, 95)
+  }if (!exists(bins)) {
+    bins = NULL
+  }if (!exists(limits)) {
+    limits = NULL
+  }if (!exists(seed)) {
+    seed = NULL
+  }if (!exists(na.rm)) {
+    na.rm = TRUE
+  }if (!exists(eff_entropy)) {
+    eff_entropy = TRUE
+  }if (!exists(cr)) {
+    cr = "AIC"
+  }if(!eff_entropy){
+    if (!exists(nboot)) {
+      nboot = 300
+    }if (!exists(burn)) {
+      burn = 50
+    }if (!exists(quiet)) {
+      quiet = NULL
+    }
+  }
+
+
+
+
+
+  start_year = Data$Year[1]
+  end_year = Data$Year[nrow(Data)]
+  end_window_size = (end_year - start_year + 1)
+  years = start_year:end_year
+
+  # Set parameters for incrementing window sizes
+  start_window_size = 10
+  rolling_step_size = 1
+
+  # Initialize a list to store results for each window size
+  results_list = list()
+
+  # Loop through different window sizes
+  for (window_size in start_window_size:end_window_size) {
+    temp_results = data.frame(Start_Year = numeric(),
+                              End_Year = numeric(),
+                              TE_x_to_y = numeric(),
+                              TE_y_to_x = numeric(),
+                              Pval_x_to_y = numeric(),
+                              Pval_y_to_x = numeric(),
+                              Stat_x = numeric(),
+                              Stat_y = numeric(),
+                              Window_size = numeric())
+
+    for (i in seq(1, length(years) - window_size + 1, by = rolling_step_size)) {
+      windowed_x = x[i:(i + window_size - 1)]
+      windowed_y = y[i:(i + window_size - 1)]
+
+      set.seed(PRNG_seed)
+
+      # Transfer Entropy calculation
+      if(eff_entropy){
+        te_results = transfer_entropy(windowed_x,
+                                      windowed_y,
+                                      lx,
+                                      ly,
+                                      q,
+                                      entropy,
+                                      shuffles,
+                                      type,
+                                      quantiles,
+                                      bins,
+                                      limits,
+                                      nboot,
+                                      burn,
+                                      quiet,
+                                      seed,
+                                      na.rm
+        )
+
+
+        TE_x_to_y = calc_ete(windowed_y,
+                             windowed_x,
+                             lx,
+                             ly,
+                             q,
+                             entropy,
+                             shuffles,
+                             type,
+                             quantiles,
+                             bins,
+                             limits,
+                             burn,
+                             seed,
+                             na.rm)
+
+        TE_y_to_x = calc_ete(windowed_y,
+                             windowed_x,
+                             lx,
+                             ly,
+                             q,
+                             entropy,
+                             shuffles,
+                             type,
+                             quantiles,
+                             bins,
+                             limits,
+                             burn,
+                             seed,
+                             na.rm)
+      }else{
+        te_results = transfer_entropy(windowed_x,
+                                      windowed_y,
+                                      lx,
+                                      ly,
+                                      q,
+                                      entropy,
+                                      shuffles,
+                                      type,
+                                      quantiles,
+                                      bins,
+                                      limits,
+                                      nboot,
+                                      burn,
+                                      quiet,
+                                      seed,
+                                      na.rm)
+
+        TE_x_to_y = te_results$coef["X->Y", "te"]
+        TE_y_to_x = te_results$coef["Y->X", "te"]
+      }
+
+      # ADF Test for Stationarity
+      adf_x = CADFtest(windowed_x, type = "drift", criterion = cr)
+      adf_y = CADFtest(windowed_y, type = "drift", criterion = cr)
+
+      temp_results = rbind(temp_results, data.frame(
+        Window_size = window_size,
+        Start_Year = years[i],
+        End_Year = years[i + window_size - 1],
+        TE_x_to_y,
+        TE_y_to_x,
+        Pval_x_to_y = te_results$coef["X->Y", "p-value"],
+        Pval_y_to_x = te_results$coef["Y->X", "p-value"],
+        Stat_x = adf_x$p.value,
+        Stat_y = adf_y$p.value
+      ))
+    }
+
+    results_list[[as.character(window_size)]] = temp_results
+  }
+
+  # Combine all results into one data frame
+  final_output = do.call(rbind, results_list)
+
+  # Save results to a CSV file on the desktop without NA values appearing in Excel
+  write.table(final_output, file = "C:/Users/User/Desktop/testa.csv", row.names = FALSE, col.names = TRUE, sep = ",", na = "")
+}
+
+
+
+
+
+
+

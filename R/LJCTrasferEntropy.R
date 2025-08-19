@@ -21,7 +21,6 @@
 #'
 #' @return A data frame containing Transfer Entropy results for each window.
 #' @export
-
 LJCTransferEntropy = function(x,
                               y,
                               Time,

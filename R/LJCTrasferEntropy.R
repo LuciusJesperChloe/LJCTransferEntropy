@@ -22,7 +22,7 @@
 #' @return A data frame containing Transfer Entropy results for each window.
 #' @export
 
-LJCTransferEntropy <- function(x,
+LJCTE <- function(x,
                                y,
                                lx = 1,
                                ly = 1,
